@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: skillcanvas-api
+    runtime: node
+    rootDir: apps/api
+    plan: free
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: WEB_ORIGIN
+        value: https://TEMP.vercel.app
