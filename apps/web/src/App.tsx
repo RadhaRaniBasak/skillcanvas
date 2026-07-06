@@ -52,6 +52,8 @@ export default function App() {
   const [notes, setNotes] = useState<MessageItem[]>([]);
   const [notesError, setNotesError] = useState("");
   const [savingNote, setSavingNote] = useState(false);
+  const [refreshingNotes, setRefreshingNotes] = useState(false);
+  const [deletingId, setDeletingId] = useState<number | null>(null);
 
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editingText, setEditingText] = useState("");
@@ -59,11 +61,14 @@ export default function App() {
 
   const loadMessages = async () => {
     try {
+      setRefreshingNotes(true);
       setNotesError("");
       const data = await apiGet<MessagesResponse>("/messages");
       setNotes(data.items ?? []);
     } catch (e) {
       setNotesError(e instanceof Error ? e.message : "Failed to load messages");
+    } finally {
+      setRefreshingNotes(false);
     }
   };
 
@@ -88,9 +93,14 @@ export default function App() {
     setEcho(null);
     setEchoError("");
 
+    if (!message.trim()) {
+      setEchoError("Please enter a message");
+      return;
+    }
+
     try {
       setSending(true);
-      const data = await apiPost<EchoResponse>("/echo", { message });
+      const data = await apiPost<EchoResponse>("/echo", { message: message.trim() });
       setEcho(data);
       setMessage("");
     } catch (e) {
@@ -125,6 +135,7 @@ export default function App() {
 
   const onDeleteNote = async (id: number) => {
     try {
+      setDeletingId(id);
       setNotesError("");
       await apiDelete<DeleteMessageResponse>(`/messages/${id}`);
       setNotes((prev) => prev.filter((n) => n.id !== id));
@@ -134,6 +145,8 @@ export default function App() {
       }
     } catch (e) {
       setNotesError(e instanceof Error ? e.message : "Failed to delete note");
+    } finally {
+      setDeletingId(null);
     }
   };
 
@@ -144,6 +157,7 @@ export default function App() {
   };
 
   const cancelEdit = () => {
+    if (updating) return;
     setEditingId(null);
     setEditingText("");
   };
@@ -169,6 +183,8 @@ export default function App() {
       setUpdating(false);
     }
   };
+
+  const busy = sending || savingNote || updating || refreshingNotes || deletingId !== null;
 
   return (
     <main className="min-h-screen bg-slate-950 text-slate-100 p-8">
@@ -200,10 +216,11 @@ export default function App() {
               value={message}
               onChange={(e) => setMessage(e.target.value)}
               placeholder="Type a message"
+              disabled={sending}
             />
             <button
               type="submit"
-              disabled={sending}
+              disabled={sending || !message.trim()}
               className="rounded-lg px-4 py-2 bg-indigo-500 hover:bg-indigo-400 disabled:opacity-60"
             >
               {sending ? "Sending..." : "Send"}
@@ -226,11 +243,12 @@ export default function App() {
               value={noteText}
               onChange={(e) => setNoteText(e.target.value)}
               placeholder="Write a note"
+              disabled={savingNote}
             />
             <div className="flex gap-2">
               <button
                 type="submit"
-                disabled={savingNote}
+                disabled={savingNote || !noteText.trim()}
                 className="rounded-lg px-4 py-2 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-60"
               >
                 {savingNote ? "Saving..." : "Save Note"}
@@ -238,9 +256,10 @@ export default function App() {
               <button
                 type="button"
                 onClick={loadMessages}
-                className="rounded-lg px-4 py-2 bg-slate-700 hover:bg-slate-600"
+                disabled={refreshingNotes}
+                className="rounded-lg px-4 py-2 bg-slate-700 hover:bg-slate-600 disabled:opacity-60"
               >
-                Refresh
+                {refreshingNotes ? "Refreshing..." : "Refresh"}
               </button>
             </div>
           </form>
@@ -249,7 +268,9 @@ export default function App() {
 
           <div className="rounded-lg border border-slate-700 divide-y divide-slate-800">
             {notes.length === 0 ? (
-              <p className="p-3 text-slate-400 text-sm">No notes yet.</p>
+              <p className="p-3 text-slate-400 text-sm">
+                {refreshingNotes ? "Loading notes..." : "No notes yet."}
+              </p>
             ) : (
               notes.map((n) => (
                 <div key={n.id} className="p-3 flex items-start justify-between gap-3">
@@ -260,12 +281,13 @@ export default function App() {
                           className="w-full rounded-lg bg-slate-800 border border-slate-700 px-3 py-2 outline-none focus:border-slate-500"
                           value={editingText}
                           onChange={(e) => setEditingText(e.target.value)}
+                          disabled={updating}
                         />
                         <div className="flex gap-2">
                           <button
                             type="button"
                             onClick={() => saveEdit(n.id)}
-                            disabled={updating}
+                            disabled={updating || !editingText.trim()}
                             className="rounded-md px-3 py-1.5 text-sm bg-amber-600 hover:bg-amber-500 disabled:opacity-60"
                           >
                             {updating ? "Saving..." : "Save"}
@@ -273,7 +295,8 @@ export default function App() {
                           <button
                             type="button"
                             onClick={cancelEdit}
-                            className="rounded-md px-3 py-1.5 text-sm bg-slate-700 hover:bg-slate-600"
+                            disabled={updating}
+                            className="rounded-md px-3 py-1.5 text-sm bg-slate-700 hover:bg-slate-600 disabled:opacity-60"
                           >
                             Cancel
                           </button>
@@ -292,16 +315,18 @@ export default function App() {
                       <button
                         type="button"
                         onClick={() => startEdit(n)}
-                        className="rounded-md px-3 py-1.5 text-sm bg-amber-700 hover:bg-amber-600"
+                        disabled={busy}
+                        className="rounded-md px-3 py-1.5 text-sm bg-amber-700 hover:bg-amber-600 disabled:opacity-60"
                       >
                         Edit
                       </button>
                       <button
                         type="button"
                         onClick={() => onDeleteNote(n.id)}
-                        className="rounded-md px-3 py-1.5 text-sm bg-rose-700 hover:bg-rose-600"
+                        disabled={busy}
+                        className="rounded-md px-3 py-1.5 text-sm bg-rose-700 hover:bg-rose-600 disabled:opacity-60"
                       >
-                        Delete
+                        {deletingId === n.id ? "Deleting..." : "Delete"}
                       </button>
                     </div>
                   )}

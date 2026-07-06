@@ -1,15 +1,23 @@
 const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:4000";
 
+async function parseError(res: Response): Promise<never> {
+  let detail = `${res.status} ${res.statusText}`;
+  try {
+    const data = (await res.json()) as { error?: string };
+    if (data?.error) detail = `${res.status}: ${data.error}`;
+  } catch {
+    // ignore json parse errors
+  }
+  throw new Error(`API ${detail}`);
+}
+
 export async function apiGet<T>(path: string): Promise<T> {
   const res = await fetch(`${API_BASE_URL}${path}`, {
     method: "GET",
     credentials: "include",
   });
 
-  if (!res.ok) {
-    throw new Error(`API ${res.status}: ${res.statusText}`);
-  }
-
+  if (!res.ok) return parseError(res);
   return res.json() as Promise<T>;
 }
 
@@ -21,10 +29,7 @@ export async function apiPost<T>(path: string, body: unknown): Promise<T> {
     body: JSON.stringify(body),
   });
 
-  if (!res.ok) {
-    throw new Error(`API ${res.status}: ${res.statusText}`);
-  }
-
+  if (!res.ok) return parseError(res);
   return res.json() as Promise<T>;
 }
 
@@ -36,10 +41,7 @@ export async function apiPut<T>(path: string, body: unknown): Promise<T> {
     body: JSON.stringify(body),
   });
 
-  if (!res.ok) {
-    throw new Error(`API ${res.status}: ${res.statusText}`);
-  }
-
+  if (!res.ok) return parseError(res);
   return res.json() as Promise<T>;
 }
 
@@ -49,9 +51,6 @@ export async function apiDelete<T>(path: string): Promise<T> {
     credentials: "include",
   });
 
-  if (!res.ok) {
-    throw new Error(`API ${res.status}: ${res.statusText}`);
-  }
-
+  if (!res.ok) return parseError(res);
   return res.json() as Promise<T>;
 }
