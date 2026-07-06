@@ -1,18 +1,14 @@
 {
   "name": "skillcanvas",
   "private": true,
+  "version": "1.0.0",
   "workspaces": [
-    "apps/*",
-    "services/*",
-    "packages/*"
+    "apps/api",
+    "apps/web"
   ],
   "scripts": {
-    "dev:web": "npm --workspace apps/web run dev",
-    "dev:api": "npm --workspace apps/api run dev",
-    "dev:insights": "npm --workspace services/insights run dev"
-  },
-  "allowScripts": {
-    "fsevents@2.3.3": true,
-    "better-sqlite3@12.11.1": true
+    "dev:api": "npm run dev -w skillcanvas-api",
+    "dev:web": "npm run dev -w skillcanvas-web",
+    "build": "npm run build -w skillcanvas-api && npm run build -w skillcanvas-web"
   }
 }
