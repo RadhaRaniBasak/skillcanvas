@@ -146,3 +146,12 @@ apps/api/skillcanvas.db
 
 apps/api/skillcanvas.db-shm
 apps/api/skillcanvas.db-wal
+
+node_modules
+dist
+.env
+.DS_Store
+
+apps/api/skillcanvas.db
+apps/api/skillcanvas.db-shm
+apps/api/skillcanvas.db-wal

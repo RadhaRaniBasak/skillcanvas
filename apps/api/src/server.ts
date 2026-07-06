@@ -23,6 +23,10 @@ db.exec(`
   )
 `);
 
+app.get("/", (_req, res) => {
+  res.json({ ok: true, message: "SkillCanvas API is live" });
+});
+
 app.get("/health", (_req, res) => {
   res.json({ ok: true, service: "skillcanvas-api" });
 });

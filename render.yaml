@@ -11,3 +11,5 @@ services:
         value: production
       - key: WEB_ORIGIN
         value: https://TEMP.vercel.app
+      - key: NODE_VERSION
+        value: 20.18.0
