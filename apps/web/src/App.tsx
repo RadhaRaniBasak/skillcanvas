@@ -1,5 +1,5 @@
-import import { apiGet } from "./lib/api";
-{ useEffect, useState } from "react";
+import { useEffect, useState } from "react";
+import { apiGet } from "./lib/api";
 
 type Health = {
   ok: boolean;
