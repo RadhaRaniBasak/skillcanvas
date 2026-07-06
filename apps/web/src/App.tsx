@@ -14,7 +14,7 @@ export default function App() {
   useEffect(() => {
     const run = async () => {
       try {
-       const data = await apiGet<Health>("/health"); 
+        const data = await apiGet<Health>("/health");
         setHealth(data);
       } catch (e) {
         setError(e instanceof Error ? e.message : "Request failed");
