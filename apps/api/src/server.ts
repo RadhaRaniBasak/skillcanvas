@@ -7,8 +7,8 @@ const app = express();
 app.use(cors({ origin: "http://localhost:5173", credentials: true }));
 app.use(express.json());
 
-// SQLite setup
-const dbPath = path.join(process.cwd(), "skillcanvas.db");
+// SQLite setup (stable file path inside apps/api)
+const dbPath = path.join(__dirname, "../skillcanvas.db");
 const db = new Database(dbPath);
 
 // Create table if not exists
@@ -39,20 +39,18 @@ app.post("/echo", (req, res) => {
 
 app.post("/messages", (req, res) => {
   const { text } = req.body ?? {};
-  if (!text || typeof text !== "string") {
+  if (!text || typeof text !== "string" || !text.trim()) {
     return res.status(400).json({ ok: false, error: "text is required" });
   }
 
   const createdAt = new Date().toISOString();
 
-  const stmt = db.prepare(
-    "INSERT INTO messages (text, created_at) VALUES (?, ?)"
-  );
-  const info = stmt.run(text, createdAt);
+  const stmt = db.prepare("INSERT INTO messages (text, created_at) VALUES (?, ?)");
+  const info = stmt.run(text.trim(), createdAt);
 
   const item = {
     id: Number(info.lastInsertRowid),
-    text,
+    text: text.trim(),
     createdAt,
   };
 
@@ -71,6 +69,57 @@ app.get("/messages", (_req, res) => {
   }));
 
   res.json({ ok: true, items });
+});
+
+app.put("/messages/:id", (req, res) => {
+  const id = Number(req.params.id);
+  const { text } = req.body ?? {};
+
+  if (!Number.isInteger(id) || id <= 0) {
+    return res.status(400).json({ ok: false, error: "valid id is required" });
+  }
+
+  if (!text || typeof text !== "string" || !text.trim()) {
+    return res.status(400).json({ ok: false, error: "text is required" });
+  }
+
+  const trimmed = text.trim();
+
+  const updateStmt = db.prepare("UPDATE messages SET text = ? WHERE id = ?");
+  const info = updateStmt.run(trimmed, id);
+
+  if (info.changes === 0) {
+    return res.status(404).json({ ok: false, error: "message not found" });
+  }
+
+  const row = db
+    .prepare("SELECT id, text, created_at FROM messages WHERE id = ?")
+    .get(id) as { id: number; text: string; created_at: string };
+
+  const item = {
+    id: row.id,
+    text: row.text,
+    createdAt: row.created_at,
+  };
+
+  res.json({ ok: true, item });
+});
+
+app.delete("/messages/:id", (req, res) => {
+  const id = Number(req.params.id);
+
+  if (!Number.isInteger(id) || id <= 0) {
+    return res.status(400).json({ ok: false, error: "valid id is required" });
+  }
+
+  const stmt = db.prepare("DELETE FROM messages WHERE id = ?");
+  const info = stmt.run(id);
+
+  if (info.changes === 0) {
+    return res.status(404).json({ ok: false, error: "message not found" });
+  }
+
+  res.json({ ok: true, deletedId: id });
 });
 
 const PORT = 4000;

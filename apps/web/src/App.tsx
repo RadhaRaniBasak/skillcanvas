@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { apiGet, apiPost } from "./lib/api";
+import { apiGet, apiPost, apiDelete, apiPut } from "./lib/api";
 
 type Health = {
   ok: boolean;
@@ -28,6 +28,16 @@ type CreateMessageResponse = {
   item: MessageItem;
 };
 
+type DeleteMessageResponse = {
+  ok: boolean;
+  deletedId: number;
+};
+
+type UpdateMessageResponse = {
+  ok: boolean;
+  item: MessageItem;
+};
+
 export default function App() {
   const [health, setHealth] = useState<Health | null>(null);
   const [loading, setLoading] = useState(true);
@@ -42,6 +52,10 @@ export default function App() {
   const [notes, setNotes] = useState<MessageItem[]>([]);
   const [notesError, setNotesError] = useState("");
   const [savingNote, setSavingNote] = useState(false);
+
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editingText, setEditingText] = useState("");
+  const [updating, setUpdating] = useState(false);
 
   const loadMessages = async () => {
     try {
@@ -106,6 +120,53 @@ export default function App() {
       setNotesError(e instanceof Error ? e.message : "Failed to save note");
     } finally {
       setSavingNote(false);
+    }
+  };
+
+  const onDeleteNote = async (id: number) => {
+    try {
+      setNotesError("");
+      await apiDelete<DeleteMessageResponse>(`/messages/${id}`);
+      setNotes((prev) => prev.filter((n) => n.id !== id));
+      if (editingId === id) {
+        setEditingId(null);
+        setEditingText("");
+      }
+    } catch (e) {
+      setNotesError(e instanceof Error ? e.message : "Failed to delete note");
+    }
+  };
+
+  const startEdit = (note: MessageItem) => {
+    setNotesError("");
+    setEditingId(note.id);
+    setEditingText(note.text);
+  };
+
+  const cancelEdit = () => {
+    setEditingId(null);
+    setEditingText("");
+  };
+
+  const saveEdit = async (id: number) => {
+    if (!editingText.trim()) {
+      setNotesError("Please enter a note");
+      return;
+    }
+
+    try {
+      setUpdating(true);
+      setNotesError("");
+      const data = await apiPut<UpdateMessageResponse>(`/messages/${id}`, {
+        text: editingText.trim(),
+      });
+
+      setNotes((prev) => prev.map((n) => (n.id === id ? data.item : n)));
+      cancelEdit();
+    } catch (e) {
+      setNotesError(e instanceof Error ? e.message : "Failed to update note");
+    } finally {
+      setUpdating(false);
     }
   };
 
@@ -191,9 +252,59 @@ export default function App() {
               <p className="p-3 text-slate-400 text-sm">No notes yet.</p>
             ) : (
               notes.map((n) => (
-                <div key={n.id} className="p-3">
-                  <p className="font-medium">{n.text}</p>
-                  <p className="text-xs text-slate-400">{n.createdAt}</p>
+                <div key={n.id} className="p-3 flex items-start justify-between gap-3">
+                  <div className="flex-1">
+                    {editingId === n.id ? (
+                      <div className="space-y-2">
+                        <input
+                          className="w-full rounded-lg bg-slate-800 border border-slate-700 px-3 py-2 outline-none focus:border-slate-500"
+                          value={editingText}
+                          onChange={(e) => setEditingText(e.target.value)}
+                        />
+                        <div className="flex gap-2">
+                          <button
+                            type="button"
+                            onClick={() => saveEdit(n.id)}
+                            disabled={updating}
+                            className="rounded-md px-3 py-1.5 text-sm bg-amber-600 hover:bg-amber-500 disabled:opacity-60"
+                          >
+                            {updating ? "Saving..." : "Save"}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={cancelEdit}
+                            className="rounded-md px-3 py-1.5 text-sm bg-slate-700 hover:bg-slate-600"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <>
+                        <p className="font-medium">{n.text}</p>
+                        <p className="text-xs text-slate-400">{n.createdAt}</p>
+                      </>
+                    )}
+                  </div>
+
+                  {editingId !== n.id && (
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => startEdit(n)}
+                        className="rounded-md px-3 py-1.5 text-sm bg-amber-700 hover:bg-amber-600"
+                      >
+                        Edit
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => onDeleteNote(n.id)}
+                        className="rounded-md px-3 py-1.5 text-sm bg-rose-700 hover:bg-rose-600"
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  )}
                 </div>
               ))
             )}
