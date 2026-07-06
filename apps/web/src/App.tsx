@@ -1,15 +1,57 @@
 import { useEffect, useState } from "react";
-import { apiGet } from "./lib/api";
+import { apiGet, apiPost } from "./lib/api";
 
 type Health = {
   ok: boolean;
   service: string;
 };
 
+type EchoResponse = {
+  ok: boolean;
+  echoed: string;
+  at: string;
+};
+
+type MessageItem = {
+  id: number;
+  text: string;
+  createdAt: string;
+};
+
+type MessagesResponse = {
+  ok: boolean;
+  items: MessageItem[];
+};
+
+type CreateMessageResponse = {
+  ok: boolean;
+  item: MessageItem;
+};
+
 export default function App() {
   const [health, setHealth] = useState<Health | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+
+  const [message, setMessage] = useState("");
+  const [echo, setEcho] = useState<EchoResponse | null>(null);
+  const [echoError, setEchoError] = useState("");
+  const [sending, setSending] = useState(false);
+
+  const [noteText, setNoteText] = useState("");
+  const [notes, setNotes] = useState<MessageItem[]>([]);
+  const [notesError, setNotesError] = useState("");
+  const [savingNote, setSavingNote] = useState(false);
+
+  const loadMessages = async () => {
+    try {
+      setNotesError("");
+      const data = await apiGet<MessagesResponse>("/messages");
+      setNotes(data.items ?? []);
+    } catch (e) {
+      setNotesError(e instanceof Error ? e.message : "Failed to load messages");
+    }
+  };
 
   useEffect(() => {
     const run = async () => {
@@ -21,32 +63,142 @@ export default function App() {
       } finally {
         setLoading(false);
       }
+
+      await loadMessages();
     };
     run();
   }, []);
 
+  const onEchoSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setEcho(null);
+    setEchoError("");
+
+    try {
+      setSending(true);
+      const data = await apiPost<EchoResponse>("/echo", { message });
+      setEcho(data);
+      setMessage("");
+    } catch (e) {
+      setEchoError(e instanceof Error ? e.message : "Request failed");
+    } finally {
+      setSending(false);
+    }
+  };
+
+  const onNoteSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setNotesError("");
+
+    if (!noteText.trim()) {
+      setNotesError("Please enter a note");
+      return;
+    }
+
+    try {
+      setSavingNote(true);
+      const data = await apiPost<CreateMessageResponse>("/messages", {
+        text: noteText.trim(),
+      });
+      setNotes((prev) => [data.item, ...prev]);
+      setNoteText("");
+    } catch (e) {
+      setNotesError(e instanceof Error ? e.message : "Failed to save note");
+    } finally {
+      setSavingNote(false);
+    }
+  };
+
   return (
     <main className="min-h-screen bg-slate-950 text-slate-100 p-8">
-      <div className="max-w-xl mx-auto rounded-2xl border border-slate-800 p-6 bg-slate-900">
-        <h1 className="text-2xl font-bold mb-4">SkillCanvas Web</h1>
+      <div className="max-w-2xl mx-auto rounded-2xl border border-slate-800 p-6 bg-slate-900 space-y-8">
+        <h1 className="text-2xl font-bold">SkillCanvas Web</h1>
 
-        {loading && <p className="text-slate-300">Checking API health...</p>}
+        <section className="space-y-2">
+          <h2 className="text-lg font-semibold">API Health</h2>
+          {loading && <p className="text-slate-300">Checking API health...</p>}
+          {!loading && error && <p className="text-red-400">API error: {error}</p>}
+          {!loading && health && (
+            <div className="space-y-1">
+              <p>
+                Status:{" "}
+                <span className="font-semibold text-emerald-400">
+                  {health.ok ? "OK" : "NOT OK"}
+                </span>
+              </p>
+              <p>Service: {health.service}</p>
+            </div>
+          )}
+        </section>
 
-        {!loading && error && (
-          <p className="text-red-400">API error: {error}</p>
-        )}
+        <section className="space-y-3">
+          <h2 className="text-lg font-semibold">Echo test (/echo)</h2>
+          <form onSubmit={onEchoSubmit} className="space-y-3">
+            <input
+              className="w-full rounded-lg bg-slate-800 border border-slate-700 px-3 py-2 outline-none focus:border-slate-500"
+              value={message}
+              onChange={(e) => setMessage(e.target.value)}
+              placeholder="Type a message"
+            />
+            <button
+              type="submit"
+              disabled={sending}
+              className="rounded-lg px-4 py-2 bg-indigo-500 hover:bg-indigo-400 disabled:opacity-60"
+            >
+              {sending ? "Sending..." : "Send"}
+            </button>
+          </form>
+          {echoError && <p className="text-red-400">Echo error: {echoError}</p>}
+          {echo && (
+            <div className="rounded-lg border border-slate-700 p-3 text-sm space-y-1">
+              <p>Echoed: {echo.echoed}</p>
+              <p>At: {echo.at}</p>
+            </div>
+          )}
+        </section>
 
-        {!loading && health && (
-          <div className="space-y-2">
-            <p>
-              Status:{" "}
-              <span className="font-semibold text-emerald-400">
-                {health.ok ? "OK" : "NOT OK"}
-              </span>
-            </p>
-            <p>Service: {health.service}</p>
+        <section className="space-y-3">
+          <h2 className="text-lg font-semibold">Notes (/messages)</h2>
+          <form onSubmit={onNoteSubmit} className="space-y-3">
+            <input
+              className="w-full rounded-lg bg-slate-800 border border-slate-700 px-3 py-2 outline-none focus:border-slate-500"
+              value={noteText}
+              onChange={(e) => setNoteText(e.target.value)}
+              placeholder="Write a note"
+            />
+            <div className="flex gap-2">
+              <button
+                type="submit"
+                disabled={savingNote}
+                className="rounded-lg px-4 py-2 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-60"
+              >
+                {savingNote ? "Saving..." : "Save Note"}
+              </button>
+              <button
+                type="button"
+                onClick={loadMessages}
+                className="rounded-lg px-4 py-2 bg-slate-700 hover:bg-slate-600"
+              >
+                Refresh
+              </button>
+            </div>
+          </form>
+
+          {notesError && <p className="text-red-400">Notes error: {notesError}</p>}
+
+          <div className="rounded-lg border border-slate-700 divide-y divide-slate-800">
+            {notes.length === 0 ? (
+              <p className="p-3 text-slate-400 text-sm">No notes yet.</p>
+            ) : (
+              notes.map((n) => (
+                <div key={n.id} className="p-3">
+                  <p className="font-medium">{n.text}</p>
+                  <p className="text-xs text-slate-400">{n.createdAt}</p>
+                </div>
+              ))
+            )}
           </div>
-        )}
+        </section>
       </div>
     </main>
   );
