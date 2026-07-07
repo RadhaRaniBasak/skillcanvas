@@ -1,4 +1,4 @@
-const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:4000";
+const API_BASE_URL = import.meta.env.https://skillcanvas-1-bb20.onrender.com || "http://localhost:4000";
 
 async function parseError(res: Response): Promise<never> {
   let detail = `${res.status} ${res.statusText}`;
