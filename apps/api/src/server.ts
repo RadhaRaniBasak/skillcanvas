@@ -11,6 +11,8 @@ const app = express();
 const CLIENT_URL = process.env.CLIENT_URL || "http://localhost:5173";
 const PORT = Number(process.env.PORT || 4000);
 const JWT_SECRET = process.env.JWT_SECRET || "dev_secret_fallback";
+const SERVER_URL = process.env.SERVER_URL || `http://localhost:${PORT}`;
+const IS_PROD = process.env.NODE_ENV === "production";
 
 app.use(express.json());
 app.use(cookieParser());
@@ -26,9 +28,8 @@ app.get("/health", (_req, res) => {
   res.json({ ok: true, service: "skillcanvas-api" });
 });
 
-// ---------- GitHub OAuth ----------
 app.get("/auth/github", (_req, res) => {
-  const redirectUri = `http://localhost:${PORT}/auth/github/callback`;
+  const redirectUri = `${SERVER_URL}/auth/github/callback`;
 
   const params = new URLSearchParams({
     client_id: process.env.GITHUB_CLIENT_ID || "",
@@ -46,7 +47,7 @@ app.get("/auth/github/callback", async (req, res) => {
       return res.status(400).json({ error: "Missing OAuth code" });
     }
 
-    const redirectUri = `http://localhost:${PORT}/auth/github/callback`;
+    const redirectUri = `${SERVER_URL}/auth/github/callback`;
 
     const tokenResp = await fetch("https://github.com/login/oauth/access_token", {
       method: "POST",
@@ -91,8 +92,8 @@ app.get("/auth/github/callback", async (req, res) => {
 
     res.cookie("token", appToken, {
       httpOnly: true,
-      sameSite: "lax",
-      secure: false, // set true with HTTPS in production
+      sameSite: IS_PROD ? "none" : "lax",
+      secure: IS_PROD,
       maxAge: 7 * 24 * 60 * 60 * 1000,
     });
 
@@ -103,48 +104,10 @@ app.get("/auth/github/callback", async (req, res) => {
   }
 });
 
-// Current user
-app.get("/me", (req, res) => {
-  try {
-    const token = req.cookies.token as string | undefined;
-    if (!token) return res.status(401).json({ error: "Unauthorized" });
-
-    const user = jwt.verify(token, JWT_SECRET);
-    return res.json({ user });
-  } catch {
-    return res.status(401).json({ error: "Invalid token" });
-  }
-});
-
-// Logout
-app.post("/logout", (_req, res) => {
-  res.clearCookie("token");
-  return res.json({ ok: true });
-});
-
-// ---------- Temporary Notes API ----------
-type Note = { id: number; title: string; content: string };
-
-let notes: Note[] = [
-  { id: 1, title: "Welcome", content: "SkillCanvas note API is working." },
-];
-
-app.get("/notes", (_req, res) => {
-  return res.json({ notes });
-});
-
-app.post("/notes", (req, res) => {
-  const { title, content } = req.body || {};
-  const newNote: Note = {
-    id: Date.now(),
-    title: String(title || "").trim(),
-    content: String(content || "").trim(),
-  };
-
-  notes.unshift(newNote);
-  return res.status(201).json({ note: newNote });
+app.get("/", (_req, res) => {
+  res.send("SkillCanvas API is running. Use /health");
 });
 
 app.listen(PORT, () => {
-  console.log(`API running on port ${PORT}`);
+  console.log(`API listening on ${PORT}`);
 });
