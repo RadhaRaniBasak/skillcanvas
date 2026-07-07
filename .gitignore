@@ -151,6 +151,22 @@ node_modules
 dist
 .env
 .DS_Store
+# dependencies
+node_modules/
+
+# env files
+.env
+.env.*
+!.env.example
+
+# build outputs
+dist/
+build/
+coverage/
+
+# OS/editor
+.DS_Store
+.vscode/
 
 apps/api/skillcanvas.db
 apps/api/skillcanvas.db-shm
